@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"/>
+<title>GreenSwipe - Climate Jobs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;width:100%;background:#020604;overflow-x:hidden}
+#root{min-height:100vh;display:flex;flex-direction:column}
+body{font-family:'DM Sans',sans-serif;-webkit-font-smoothing:antialiased}
+@keyframes sd{from{transform:translate(-50%,-12px);opacity:0}to{transform:translate(-50%,0);opacity:1}}
+@keyframes su{from{transform:translateY(100%)}to{transform:translateY(0)}}
+@keyframes fi{from{opacity:0}to{opacity:1}}
+@keyframes spin{to{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+@keyframes shake{0%,100%{transform:translateX(0)}20%,60%{transform:translateX(-6px)}40%,80%{transform:translateX(6px)}}
+input{outline:none;font-family:'DM Sans',sans-serif}
+input:-webkit-autofill{-webkit-box-shadow:0 0 0 100px #081410 inset!important;-webkit-text-fill-color:#d0e8d8!important}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#1a3020;border-radius:2px}
+@media(min-width:600px){
+  body{background:#010403}
+  #root{align-items:center;background:radial-gradient(ellipse at 30% 20%,#042e1410 0%,transparent 55%),radial-gradient(ellipse at 70% 80%,#082e1810 0%,transparent 55%),#010403}
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useRef,useCallback}=React;
+
+// ============================================================
+// AUTH CONFIG
+// To change your admin password:
+//   1. Open browser console on the hosted page
+//   2. Run: hashPassword("YourNewPassword").then(console.log)
+//   3. Copy result and replace ADMIN_PW_HASH below
+//   4. Re-upload the HTML file
+// ============================================================
+const ADMIN_USERNAME = "skylar";
+const ADMIN_PW_HASH  = "8f2b1c9e4d6a7f3e5b8c2d9f1a4e7b3c6d9f2a5e8b1c4d7f0a3e6b9c2d5f8a1";
+
+// ============================================================
+// GOOGLE APPS SCRIPT CONFIG
+// Paste your deployed Apps Script URL here after setup.
+// See greenswipe-sheet-script.js for full setup instructions.
+// ============================================================
+const APPS_SCRIPT_URL = ""; // paste your URL here e.g. "https://script.google.com/macros/s/XXX/exec"
+const APPS_SCRIPT_SECRET = "greenswipe2024"; // must match the SECRET_KEY in the Apps Script
+
+// Simple hash using SubtleCrypto (built into all modern browsers)
+async function hashPassword(pw){
+  const buf = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pw));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+// ============================================================
+// ICONS - pure SVG, zero emoji
+// ============================================================
+const Icon={
+  leaf:    ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.9.2 7.71C18.5 11.55 16.5 13 14 13c-1.5 0-3 .5-4 1.5"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/></svg>,
+  zap:     ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="13,2 3,14 12,14 11,22 21,10 12,10"/></svg>,
+  plug:    ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 6L6 18"/><path d="M7 17H4a3 3 0 0 1-3-3V4"/><path d="M17 7V4a3 3 0 0 1 3 3v3"/><line x1="8" y1="8" x2="8" y2="12"/><line x1="16" y1="8" x2="16" y2="12"/></svg>,
+  monitor: ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8"/><path d="M12 17v4"/></svg>,
+  trending:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="23,6 13.5,15.5 8.5,10.5 1,18"/><polyline points="17,6 23,6 23,12"/></svg>,
+  building:()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="2" width="18" height="20"/><path d="M9 22V12h6v10"/><path d="M9 7h1"/><path d="M14 7h1"/><path d="M9 12h1"/><path d="M14 12h1"/></svg>,
+  factory: ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M2 20a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V8l-7 5V8l-7 5V4a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z"/></svg>,
+  globe:   ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>,
+  star:    ()=><svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><polygon points="12,2 15.09,8.26 22,9.27 17,14.14 18.18,21.02 12,17.77 5.82,21.02 7,14.14 2,9.27 8.91,8.26"/></svg>,
+  x:       ()=><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+  table:   ()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/></svg>,
+  download:()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7,10 12,15 17,10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>,
+  refresh: ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="1,4 1,10 7,10"/><path d="M3.51 15a9 9 0 1 0 .49-4.95"/></svg>,
+  arrowup: ()=><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="18,15 12,9 6,15"/></svg>,
+  arrowdown:()=><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="6,9 12,15 18,9"/></svg>,
+  arrowright:()=><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round"><polyline points="9,18 15,12 9,6"/></svg>,
+  extlink: ()=><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15,3 21,3 21,9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>,
+  seedling:()=><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M12 22V13"/><path d="M20 7.5a8 8 0 0 0-16 0c0 6 8 10 8 10s8-4 8-10Z"/></svg>,
+  lock:    ()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>,
+  user:    ()=><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>,
+  logout:  ()=><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16,17 21,12 16,7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+  users:   ()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>,
+  eye:     ()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+  eyeoff:  ()=><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"/><line x1="1" y1="1" x2="23" y2="23"/></svg>,
+};
+
+// Send a saved job to Google Sheets via Apps Script
+async function syncJobToSheet(username, job) {
+  if (!APPS_SCRIPT_URL) return null;
+  try {
+    const res = await fetch(APPS_SCRIPT_URL, {
+      method: "POST",
+      body: JSON.stringify({ secret: APPS_SCRIPT_SECRET, username, job }),
+    });
+    const data = await res.json();
+    if (data.ok && data.sheetUrl) {
+      // Store the sheet URL per user so we can link to it
+      const key = "gs:sheeturl:" + username;
+      ls.set(key, data.sheetUrl);
+      return data.sheetUrl;
+    }
+  } catch(e) { console.warn("Sheet sync failed:", e); }
+  return null;
+}
+
+function getUserSheetUrl(username) {
+  return ls.get("gs:sheeturl:" + username) || null;
+}
+// ============================================================
+const JOBS=[
+  {id:1, title:"Sr. Client Success Manager - CA Demand Response",company:"EnergyHub",source:"Climatebase",sector:"Virtual Power Plants",location:"Remote (US)",salary:"Competitive + 401k",summary:"EnergyHub turns smart thermostats, EVs, and batteries into virtual power plants for utilities. This Sr. CSM owns the full CPUC/CAISO demand response program relationship - enrollment, dispatch, post-event reporting, grant management, and expansion.",responsibilities:"Own CAISO DR market participation: revenue modeling, resource registration, market bidding, dispatch, and post-event reporting. Manage utility stakeholders and state agency grant counterparts.",requirements:"CAISO demand response (DRAM, ELRP) and/or DSM program experience strongly preferred.",why_fit:"This is almost your exact job at the utility software layer. Your CAISO ops, enrollment workflows, and cross-functional delivery are a direct match - this is your #1 application.",match_score:98,posted_ago:"Jan 2025",url:"https://job-boards.greenhouse.io/energyhub/jobs/8218284002"},
+  {id:2, title:"Senior Technical Project Manager",company:"Energy Solutions",source:"Greenhouse",sector:"Distributed Energy",location:"Remote (US)",salary:"$107k-$140k",summary:"Energy Solutions delivers DER and efficiency programs for utilities since 1995. This Sr. TPM leads multi-phase program delivery - building scalable frameworks, managing cross-functional teams, and mentoring junior PMs.",responsibilities:"Manage concurrent technical projects with full scope/budget/quality accountability. Build delivery timelines. Mentor junior PMs.",requirements:"5+ yrs managing complex technical projects. PMP or equivalent required.",why_fit:"Almost your exact current role across 5 markets. Your 25% dispatch time reduction and $100K automation case study are immediate talking points.",match_score:96,posted_ago:"New",url:"https://job-boards.greenhouse.io/energysolutions/jobs/5044867007"},
+  {id:3, title:"Customer Success Manager",company:"Amperon",source:"Greenhouse",sector:"Grid Technology",location:"Remote (US)",salary:"Competitive + equity",summary:"Amperon is the AI forecasting company of the energy transition, helping utilities predict demand. You would manage a diverse portfolio of utility customers as a trusted advisor.",responsibilities:"Own utility customer portfolio across the full CS lifecycle. Lead QBRs, onboarding, escalations.",requirements:"2-3 yrs CS in energy or B2B SaaS. Electricity market fluency preferred.",why_fit:"Your MISO, PJM, CAISO, IESO, AESO background is exactly what Amperon needs - you would be a rare hire who already speaks their customers' language.",match_score:94,posted_ago:"Active",url:"https://job-boards.greenhouse.io/amperon/jobs/5103898007"},
+  {id:4, title:"Senior Customer Success Manager",company:"Yes Energy",source:"Greenhouse",sector:"Grid Technology",location:"Boston / Boulder / Remote",salary:"Competitive",summary:"Yes Energy provides real-time power market data across North American ISOs. The Sr. CSM manages strategic accounts helping utilities and traders extract value from complex market data platforms.",responsibilities:"Own strategic energy market data accounts. Lead business reviews, renewals, and expansion conversations.",requirements:"Senior CS experience in energy or B2B SaaS. Strong North American market familiarity.",why_fit:"Your hands-on MISO, PJM, CAISO, IESO, AESO depth is genuinely rare in CS - Yes Energy would value your market knowledge as much as your relationship skills.",match_score:92,posted_ago:"Aug 2025",url:"https://job-boards.greenhouse.io/yesenergy/jobs/4887934008"},
+  {id:5, title:"Product Manager, Virtual Power Plants",company:"GoodLeap",source:"Lever",sector:"Virtual Power Plants",location:"Remote (US)",salary:"Competitive",summary:"GoodLeap is scaling its VPP platform dispatching DER fleets into CAISO, ISO-NE, ERCOT, and PJM. This PM owns day-of event operations, tooling, SOPs, and KPI tracking.",responsibilities:"Coordinate VPP dispatch events across ISO/RTO markets. Build operational tooling and SOPs.",requirements:"3-5 yrs product/ops in energy, DER aggregation, or grid. Hands-on VPP or demand response experience.",why_fit:"Your CAISO, PJM, MISO, IESO, AESO experience is rare. GoodLeap is building exactly what you have been operating at Voltus.",match_score:91,posted_ago:"Feb 2026",url:"https://jobs.lever.co/goodleap/e9ac4afb-ab22-451d-a90a-26eeab316062"},
+  {id:6, title:"Sr. Client Success Manager - Energy Projects",company:"VECKTA",source:"Climatebase",sector:"Distributed Energy",location:"Remote (North America)",salary:"Competitive + equity",summary:"VECKTA streamlines how Fortune 500s buy onsite DER and microgrid systems. The Sr. CSM is the primary contact for enterprise clients - overseeing DER deployments and driving procurement.",responsibilities:"Own Fortune 500 client relationships across the full energy project lifecycle. Move business cases to RFPs and operating assets.",requirements:"Proven client-facing experience for large, complex stakeholder groups. Strong PM skills.",why_fit:"Your DER delivery, multi-stakeholder management, and process-building expertise at Voltus translate directly.",match_score:89,posted_ago:"Active",url:"https://climatebase.org/job/55471014/"},
+  {id:7, title:"Technology Delivery Manager, DERMS",company:"GE Vernova",source:"LinkedIn",sector:"Grid Technology",location:"Remote (US)",salary:"Competitive",summary:"GE Vernova delivers enterprise DERMS to utilities across North America. The Delivery Manager owns end-to-end project delivery from pre-sales through go-live.",responsibilities:"Lead DERMS implementations as primary client accountability owner. Define delivery standards.",requirements:"Strong project delivery background in grid software, DERMS, or utility tech.",why_fit:"Your DER enrollment, market registration, and cross-functional program delivery maps directly to enterprise DERMS delivery.",match_score:88,posted_ago:"Active",url:"https://www.linkedin.com/jobs/"},
+  {id:8, title:"Manager of Customer Success, Scaled",company:"DroneDeploy",source:"ClimateTechList",sector:"Climate Software",location:"Remote (US)",salary:"Competitive",summary:"DroneDeploy's reality capture AI serves utilities and renewables operators. This CS Manager leads the Scaled team responsible for team strategy, coaching, and retention.",responsibilities:"Lead and coach Renewal Managers and Scaled CSMs. Own team performance and scaled engagement strategy.",requirements:"Experienced CS manager with track record developing teams and optimizing scaled processes.",why_fit:"You already do this at Voltus - 100% retention, 2 promotions in under 2 years. Clean lateral move with explicit management scope.",match_score:90,posted_ago:"Active",url:"https://www.climatetechlist.com/job/dronedeploy-manager-of-customer-success-scaled-ewvovID0CON5Xd"},
+  {id:9, title:"Customer Success Director",company:"Ndustrial",source:"ClimateTechList",sector:"Grid Technology",location:"Raleigh, NC (Remote OK)",salary:"Competitive",summary:"Ndustrial's AI+IoT platform helps industrial companies optimize energy intensity for clients like Lineage and ABB. The CS Director leads and expands their global CS function.",responsibilities:"Lead and expand the global CS function. Define CS strategy, best practices, and processes.",requirements:"10+ yrs CS leadership in SaaS, IoT, or industrial tech. Energy or DER experience preferred.",why_fit:"Your leadership track record, process improvement work, and energy domain expertise position you for a Director step-up.",match_score:85,posted_ago:"Active",url:"https://www.climatetechlist.com/job/ndustrial-customer-success-director-Rnn12wq8MHFlhf"},
+  {id:10,title:"Sr. CSM - Strategic Accounts (DER APIs)",company:"Enode",source:"Climatebase",sector:"Virtual Power Plants",location:"Remote (Europe/US)",salary:"Competitive + equity",summary:"Enode builds APIs connecting EVs, batteries, and solar for demand response - backed by Lowercarbon Capital and YC. The Sr. CSM works with leading energy companies to launch and scale DR products.",responsibilities:"Own strategic customer relationships with leading energy companies. Launch and scale EV/battery demand response products.",requirements:"5+ yrs CS at a fast-growing startup or consulting with energy/tech focus.",why_fit:"Your DER demand response background, cross-functional program work, and Voltus startup CS experience maps well to Enode's growth stage.",match_score:80,posted_ago:"Active",url:"https://climatebase.org/job/59760609/"},
+  {id:11,title:"Sr. Director, Program Operations",company:"U.S. Energy Foundation",source:"Greenhouse",sector:"Policy & Advocacy",location:"Remote (US)",salary:"Competitive nonprofit",summary:"The U.S. Energy Foundation funds clean energy education and policy with 100+ staff. The Sr. Director of Program Operations is the primary budget and systems lead for the Program team.",responsibilities:"Lead budget forecasting and resource management. Design operational systems. Partner with senior leadership.",requirements:"Significant experience managing complex budgets and multi-team ops at scale.",why_fit:"Your $150M portfolio oversight, automation business case, and systems work at Voltus demonstrates exactly the operational leadership EF needs.",match_score:79,posted_ago:"Active",url:"https://job-boards.greenhouse.io/energyfoundation/jobs/7522800003"},
+  {id:12,title:"Sr. Enablement Specialist - Edge DERMS",company:"EnergyHub",source:"Greenhouse",sector:"Virtual Power Plants",location:"Remote (US)",salary:"Competitive",summary:"EnergyHub helps utilities build virtual power plants. This Enablement role equips CS and Sales to position Edge DERMS - translating complex DER concepts into compelling commercial narratives.",responsibilities:"Build enablement playbooks and training for commercial teams. Translate DER concepts into clear, scalable materials.",requirements:"Strong communication and cross-functional skills. DER or utility-facing background preferred.",why_fit:"You have been building the playbooks at Voltus. This formalizes that at a DERMS company you would understand from day one.",match_score:83,posted_ago:"2 wks ago",url:"https://job-boards.greenhouse.io/energyhub/jobs/8425512002"},
+];
+
+const SRC={"Greenhouse":{bg:"#0b1f08",color:"#86efac",dot:"#22c55e"},"Lever":{bg:"#081525",color:"#7dd3fc",dot:"#38bdf8"},"ClimateTechList":{bg:"#1f1808",color:"#fcd34d",dot:"#f59e0b"},"Climatebase":{bg:"#081a10",color:"#6ee7b7",dot:"#10b981"},"LinkedIn":{bg:"#081020",color:"#93c5fd",dot:"#60a5fa"}};
+const SEC={"Distributed Energy":{accent:"#34d399",bg:"#050e07",Icon:Icon.zap},"Grid Technology":{accent:"#60a5fa",bg:"#050b14",Icon:Icon.plug},"Climate Software":{accent:"#c084fc",bg:"#0d0718",Icon:Icon.monitor},"Clean Energy Finance":{accent:"#a3e635",bg:"#090f05",Icon:Icon.trending},"Policy & Advocacy":{accent:"#f472b6",bg:"#130508",Icon:Icon.building},"Virtual Power Plants":{accent:"#2dd4bf",bg:"#051313",Icon:Icon.factory}};
+const SS=s=>SEC[s]||{accent:"#34d399",bg:"#050e07",Icon:Icon.globe};
+const SR=s=>SRC[s]||SRC["Greenhouse"];
+
+// ============================================================
+// STORAGE
+// Keys: gs:users (registry), gs:session (current user),
+//       gs:data:{username} (per-user saved jobs + idx)
+// ============================================================
+const ls={
+  get:k=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):null;}catch{return null;}},
+  set:(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));}catch(e){console.warn(e);}},
+  del:k=>{try{localStorage.removeItem(k);}catch{}},
+};
+
+function getUserData(username){
+  return ls.get("gs:data:"+username)||{idx:0,saved:[]};
+}
+function setUserData(username,data){
+  ls.set("gs:data:"+username,data);
+}
+
+// ============================================================
+// LOGIN SCREEN
+// ============================================================
+function LoginScreen({onLogin}){
+  const [mode,setMode]=useState("login"); // "login" | "register" | "reset"
+  const [username,setUsername]=useState("");
+  const [password,setPassword]=useState("");
+  const [showPw,setShowPw]=useState(false);
+  const [confirm,setConfirm]=useState("");
+  const [newPw,setNewPw]=useState("");
+  const [error,setError]=useState("");
+  const [success,setSuccess]=useState("");
+  const [loading,setLoading]=useState(false);
+  const [shake,setShake]=useState(false);
+  const pwRef=useRef();
+
+  const doShake=()=>{setShake(true);setTimeout(()=>setShake(false),500);};
+  const switchMode=(m)=>{setMode(m);setError("");setSuccess("");setPassword("");setConfirm("");setNewPw("");};
+
+  const handleSubmit=async(e)=>{
+    e.preventDefault();
+    setError(""); setSuccess(""); setLoading(true);
+    const u=username.trim().toLowerCase();
+    if(!u){setError("Please enter a username.");setLoading(false);doShake();return;}
+
+    const users=ls.get("gs:users")||{};
+
+    // ── RESET PASSWORD ────────────────────────────────────────
+    if(mode==="reset"){
+      if(!newPw||!confirm){setError("Please fill in all fields.");setLoading(false);doShake();return;}
+      if(newPw.length<6){setError("Password must be at least 6 characters.");setLoading(false);doShake();return;}
+      if(newPw!==confirm){setError("Passwords do not match.");setLoading(false);doShake();return;}
+      // Verify they know their current password first (or admin resets any user)
+      if(!password){setError("Enter your current password to confirm.");setLoading(false);doShake();return;}
+      const oldHash=await hashPassword(password);
+      const isAdminUser=(u===ADMIN_USERNAME&&(oldHash===ADMIN_PW_HASH||(users[u]&&users[u].hash===oldHash)));
+      const isNormalUser=users[u]&&users[u].hash===oldHash;
+      if(!isAdminUser&&!isNormalUser){setError("Current password is incorrect.");setLoading(false);doShake();return;}
+      const newHash=await hashPassword(newPw);
+      const existing=users[u]||{isAdmin:u===ADMIN_USERNAME,joinedAt:Date.now()};
+      ls.set("gs:users",{...users,[u]:{...existing,hash:newHash}});
+      setSuccess("Password updated! You can now log in.");
+      setLoading(false);
+      setTimeout(()=>switchMode("login"),1800);
+      return;
+    }
+
+    if(!password){setError("Please enter your password.");setLoading(false);doShake();return;}
+    const hash=await hashPassword(password);
+
+    // ── LOGIN ─────────────────────────────────────────────────
+    if(mode==="login"){
+      if(u===ADMIN_USERNAME){
+        const storedHash=users[u]?.hash;
+        const valid=storedHash?hash===storedHash:hash===ADMIN_PW_HASH;
+        if(valid){
+          if(!users[u]) ls.set("gs:users",{...users,[u]:{hash,isAdmin:true,joinedAt:Date.now()}});
+          ls.set("gs:session",{username:u,isAdmin:true});
+          onLogin(u,true);
+        } else {setError("Incorrect password.");doShake();}
+      } else {
+        if(!users[u]){setError("No account found. Register below.");doShake();}
+        else if(users[u].hash!==hash){setError("Incorrect password.");doShake();}
+        else{ls.set("gs:session",{username:u,isAdmin:false});onLogin(u,false);}
+      }
+    }
+
+    // ── REGISTER ──────────────────────────────────────────────
+    else if(mode==="register"){
+      if(u===ADMIN_USERNAME){setError("That username is reserved.");doShake();setLoading(false);return;}
+      if(users[u]){setError("Username taken. Try another or log in.");doShake();setLoading(false);return;}
+      if(password.length<6){setError("Password must be at least 6 characters.");doShake();setLoading(false);return;}
+      if(password!==confirm){setError("Passwords do not match.");doShake();setLoading(false);return;}
+      ls.set("gs:users",{...users,[u]:{hash,isAdmin:false,joinedAt:Date.now()}});
+      ls.set("gs:session",{username:u,isAdmin:false});
+      onLogin(u,false);
+    }
+
+    setLoading(false);
+  };
+
+  const inp={
+    background:"#081410",border:"1px solid #1a3020",borderRadius:10,
+    padding:"12px 14px",color:"#d0e8d8",fontSize:14,width:"100%",
+    transition:"border-color .2s",
+  };
+
+  const titles={login:"Welcome back",register:"Create your account",reset:"Reset your password"};
+  const btnLabels={login:"Sign in",register:"Create account",reset:"Update password"};
+
+  return(
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",padding:20,
+      minHeight:"100vh",background:"radial-gradient(ellipse at 30% 40%,#052e1615 0%,transparent 55%),#020604"}}>
+      <div style={{width:"100%",maxWidth:380,animation:"fi .3s ease"}}>
+        {/* Logo */}
+        <div style={{textAlign:"center",marginBottom:32}}>
+          <div style={{width:52,height:52,borderRadius:14,background:"linear-gradient(135deg,#059669,#34d399)",
+            display:"flex",alignItems:"center",justifyContent:"center",color:"white",margin:"0 auto 14px"}}>
+            <Icon.leaf/>
+          </div>
+          <div style={{color:"#e2ede8",fontWeight:700,fontSize:22,fontFamily:"'DM Sans',sans-serif"}}>GreenSwipe</div>
+          <div style={{color:"#1e4028",fontSize:11,fontFamily:"'DM Mono',monospace",marginTop:4}}>
+            Climate job matching - private &amp; personal
+          </div>
+        </div>
+
+        {/* Card */}
+        <div style={{background:"#030906",border:"1px solid #1a2e20",borderRadius:20,padding:28,
+          boxShadow:"0 24px 60px rgba(0,0,0,.6)",animation:shake?"shake .4s ease":undefined}}>
+          <div style={{color:"#b0ccc0",fontWeight:600,fontSize:15,fontFamily:"'DM Sans',sans-serif",marginBottom:20}}>
+            {titles[mode]}
+          </div>
+
+          <form onSubmit={handleSubmit} style={{display:"flex",flexDirection:"column",gap:12}}>
+            {/* Username */}
+            <div>
+              <label style={{color:"#2a5040",fontSize:10,fontWeight:700,letterSpacing:1.2,fontFamily:"'DM Mono',monospace",display:"block",marginBottom:5}}>USERNAME</label>
+              <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+                <div style={{position:"absolute",left:12,color:"#2a5040"}}><Icon.user/></div>
+                <input style={{...inp,paddingLeft:40}} type="text" placeholder="your username" autoCapitalize="none"
+                  autoCorrect="off" spellCheck="false" value={username}
+                  onChange={e=>setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g,""))}
+                  onFocus={e=>e.target.style.borderColor="#34d399"} onBlur={e=>e.target.style.borderColor="#1a3020"}/>
+              </div>
+            </div>
+
+            {/* Current password (login, register, and reset) */}
+            <div>
+              <label style={{color:"#2a5040",fontSize:10,fontWeight:700,letterSpacing:1.2,fontFamily:"'DM Mono',monospace",display:"block",marginBottom:5}}>
+                {mode==="reset"?"CURRENT PASSWORD":"PASSWORD"}
+              </label>
+              <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+                <div style={{position:"absolute",left:12,color:"#2a5040"}}><Icon.lock/></div>
+                <input style={{...inp,paddingLeft:40,paddingRight:44}} type={showPw?"text":"password"}
+                  placeholder={mode==="register"?"min. 6 characters":mode==="reset"?"your current password":"your password"}
+                  value={password} onChange={e=>setPassword(e.target.value)}
+                  onFocus={e=>e.target.style.borderColor="#34d399"} onBlur={e=>e.target.style.borderColor="#1a3020"}/>
+                <button type="button" onClick={()=>setShowPw(v=>!v)}
+                  style={{position:"absolute",right:12,background:"none",border:"none",color:"#2a5040",cursor:"pointer",padding:2}}>
+                  {showPw?<Icon.eyeoff/>:<Icon.eye/>}
+                </button>
+              </div>
+            </div>
+
+            {/* New password (reset only) */}
+            {mode==="reset"&&<div>
+              <label style={{color:"#2a5040",fontSize:10,fontWeight:700,letterSpacing:1.2,fontFamily:"'DM Mono',monospace",display:"block",marginBottom:5}}>NEW PASSWORD</label>
+              <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+                <div style={{position:"absolute",left:12,color:"#2a5040"}}><Icon.lock/></div>
+                <input style={{...inp,paddingLeft:40}} type={showPw?"text":"password"}
+                  placeholder="min. 6 characters" value={newPw} onChange={e=>setNewPw(e.target.value)}
+                  onFocus={e=>e.target.style.borderColor="#34d399"} onBlur={e=>e.target.style.borderColor="#1a3020"}/>
+              </div>
+            </div>}
+
+            {/* Confirm password (register + reset) */}
+            {(mode==="register"||mode==="reset")&&<div>
+              <label style={{color:"#2a5040",fontSize:10,fontWeight:700,letterSpacing:1.2,fontFamily:"'DM Mono',monospace",display:"block",marginBottom:5}}>
+                {mode==="reset"?"CONFIRM NEW PASSWORD":"CONFIRM PASSWORD"}
+              </label>
+              <div style={{position:"relative",display:"flex",alignItems:"center"}}>
+                <div style={{position:"absolute",left:12,color:"#2a5040"}}><Icon.lock/></div>
+                <input style={{...inp,paddingLeft:40}} type={showPw?"text":"password"}
+                  placeholder="repeat password" value={confirm} onChange={e=>setConfirm(e.target.value)}
+                  onFocus={e=>e.target.style.borderColor="#34d399"} onBlur={e=>e.target.style.borderColor="#1a3020"}/>
+              </div>
+            </div>}
+
+            {/* Error */}
+            {error&&<div style={{background:"#2d0810",border:"1px solid #7f1d1d",borderRadius:8,padding:"9px 12px",
+              color:"#fca5a5",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>{error}</div>}
+
+            {/* Success */}
+            {success&&<div style={{background:"#052e16",border:"1px solid #166534",borderRadius:8,padding:"9px 12px",
+              color:"#86efac",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>{success}</div>}
+
+            {/* Submit */}
+            <button type="submit" disabled={loading}
+              style={{background:loading?"#0a1a10":"linear-gradient(135deg,#065f46,#059669)",border:"none",
+                borderRadius:12,padding:"13px",color:"#fff",fontWeight:700,fontSize:14,
+                cursor:loading?"not-allowed":"pointer",fontFamily:"'DM Sans',sans-serif",marginTop:4,
+                opacity:loading?.6:1,display:"flex",alignItems:"center",justifyContent:"center",gap:8}}>
+              {loading&&<span style={{width:14,height:14,borderRadius:"50%",border:"2px solid #34d39940",
+                borderTop:"2px solid #34d399",animation:"spin 1s linear infinite",display:"inline-block"}}/>}
+              {loading?"Please wait...":btnLabels[mode]}
+            </button>
+          </form>
+
+          {/* Mode switcher links */}
+          <div style={{marginTop:18,display:"flex",flexDirection:"column",gap:8,alignItems:"center"}}>
+            {mode!=="login"&&(
+              <div style={{color:"#2a4838",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+                <button onClick={()=>switchMode("login")}
+                  style={{background:"none",border:"none",color:"#34d399",fontWeight:600,cursor:"pointer",
+                    fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:0}}>
+                  Back to login
+                </button>
+              </div>
+            )}
+            {mode==="login"&&(
+              <>
+                <div style={{color:"#2a4838",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+                  No account?{" "}
+                  <button onClick={()=>switchMode("register")}
+                    style={{background:"none",border:"none",color:"#34d399",fontWeight:600,cursor:"pointer",
+                      fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:0}}>
+                    Register
+                  </button>
+                </div>
+                <div style={{color:"#1a3028",fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>
+                  Forgot password?{" "}
+                  <button onClick={()=>switchMode("reset")}
+                    style={{background:"none",border:"none",color:"#4a8060",fontWeight:600,cursor:"pointer",
+                      fontSize:12,fontFamily:"'DM Sans',sans-serif",padding:0}}>
+                    Reset it
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+
+        <div style={{textAlign:"center",marginTop:16,color:"#162018",fontSize:10,fontFamily:"'DM Mono',monospace"}}>
+          Your data stays on this device &middot; no server
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// ADMIN PANEL
+// ============================================================
+function AdminPanel({onClose,currentUser}){
+  const users=ls.get("gs:users")||{};
+  const userList=Object.entries(users).map(([username,meta])=>{
+    const data=getUserData(username);
+    return{username,isAdmin:meta.isAdmin,joinedAt:meta.joinedAt,saved:data.saved||[],idx:data.idx||0};
+  });
+
+  const downloadUserCSV=(user)=>{
+    if(!user.saved.length)return;
+    const esc=v=>`"${String(v||"").replace(/"/g,'""')}"`;
+    const headers=["Title","Company","Source","Sector","Location","Salary","Why It Fits","Apply Link","Saved On"];
+    const rows=user.saved.map(j=>[j.title,j.company,j.source,j.sector,j.location,j.salary||"-",(j.why_fit||"").slice(0,150),j.url||"-",new Date().toLocaleDateString()].map(esc).join(","));
+    const csv=[headers.map(esc).join(","),...rows].join("\n");
+    const blob=new Blob([csv],{type:"text/csv"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download=`GreenSwipe_${user.username}.csv`;
+    a.click();
+  };
+
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",alignItems:"flex-end",
+      background:"rgba(0,0,0,.85)",backdropFilter:"blur(6px)",animation:"fi .18s ease"}} onClick={onClose}>
+      <div style={{width:"100%",maxHeight:"85vh",borderRadius:"22px 22px 0 0",background:"#030906",
+        border:"1px solid #1a2e20",borderBottom:"none",display:"flex",flexDirection:"column",
+        animation:"su .26s cubic-bezier(.34,1.56,.64,1)"}} onClick={e=>e.stopPropagation()}>
+
+        <div style={{padding:"18px 18px 14px",borderBottom:"1px solid #0e1e12",flexShrink:0,
+          display:"flex",alignItems:"center",justifyContent:"space-between"}}>
+          <div style={{display:"flex",alignItems:"center",gap:8}}>
+            <div style={{color:"#a3e635"}}><Icon.users/></div>
+            <div>
+              <div style={{color:"#d8ece2",fontWeight:700,fontSize:15,fontFamily:"'DM Sans',sans-serif"}}>
+                Admin Panel - {userList.length} user{userList.length!==1?"s":""}
+              </div>
+              <div style={{color:"#1e3828",fontSize:9,fontFamily:"'DM Mono',monospace",marginTop:1}}>
+                Logged in as {currentUser}
+              </div>
+            </div>
+          </div>
+          <button onClick={onClose} style={{background:"#091410",border:"1px solid #132018",borderRadius:7,
+            padding:"5px 11px",color:"#305040",cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace"}}>
+            close
+          </button>
+        </div>
+
+        <div style={{flex:1,overflow:"auto",padding:16,display:"flex",flexDirection:"column",gap:10}}>
+          {userList.length===0&&(
+            <div style={{textAlign:"center",padding:"30px 0",color:"#1e3028",fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>
+              No users yet
+            </div>
+          )}
+          {userList.map(u=>(
+            <div key={u.username} style={{borderRadius:14,padding:"14px 16px",
+              background:u.username===currentUser?"#081c10":"#060d08",
+              border:`1px solid ${u.username===currentUser?"#1a4828":"#0e1c10"}`}}>
+              <div style={{display:"flex",alignItems:"flex-start",justifyContent:"space-between",gap:12}}>
+                <div style={{flex:1}}>
+                  <div style={{display:"flex",alignItems:"center",gap:8,marginBottom:4}}>
+                    <div style={{color:"#c8e8d0",fontWeight:700,fontSize:14,fontFamily:"'DM Sans',sans-serif"}}>{u.username}</div>
+                    {u.isAdmin&&<span style={{background:"#0a1c08",border:"1px solid #1a4020",borderRadius:5,
+                      padding:"1px 7px",color:"#34d399",fontSize:9,fontFamily:"'DM Mono',monospace"}}>admin</span>}
+                    {u.username===currentUser&&<span style={{background:"#081018",border:"1px solid #162430",borderRadius:5,
+                      padding:"1px 7px",color:"#60a5fa",fontSize:9,fontFamily:"'DM Mono',monospace"}}>you</span>}
+                  </div>
+                  <div style={{color:"#2a4838",fontSize:11,fontFamily:"'DM Mono',monospace"}}>
+                    {u.idx}/{JOBS.length} reviewed &middot; {u.saved.length} saved
+                    {u.joinedAt?` &middot; joined ${new Date(u.joinedAt).toLocaleDateString()}`:""}
+                  </div>
+                  {/* Mini saved list */}
+                  {u.saved.length>0&&(
+                    <div style={{marginTop:8,display:"flex",flexWrap:"wrap",gap:4}}>
+                      {u.saved.slice(0,3).map((j,i)=>{
+                        const s=SS(j.sector);
+                        return <span key={i} style={{background:`${s.accent}10`,border:`1px solid ${s.accent}20`,
+                          color:s.accent,borderRadius:6,padding:"2px 8px",fontSize:10,fontFamily:"'DM Mono',monospace"}}>
+                          {j.company}
+                        </span>;
+                      })}
+                      {u.saved.length>3&&<span style={{color:"#2a4838",fontSize:10,fontFamily:"'DM Mono',monospace",
+                        alignSelf:"center"}}>+{u.saved.length-3} more</span>}
+                    </div>
+                  )}
+                </div>
+                {u.saved.length>0&&(
+                  <button onClick={()=>downloadUserCSV(u)}
+                    style={{background:"#081810",border:"1px solid #1a3020",borderRadius:8,padding:"7px 10px",
+                      color:"#34d399",cursor:"pointer",display:"flex",alignItems:"center",gap:5,flexShrink:0,
+                      fontSize:11,fontFamily:"'DM Mono',monospace"}}>
+                    <Icon.download/> CSV
+                  </button>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SOURCE PILL
+// ============================================================
+function Pill({source}){
+  const sr=SR(source);
+  return <span style={{background:sr.bg,border:`1px solid ${sr.color}22`,borderRadius:5,padding:"2px 7px",
+    display:"inline-flex",alignItems:"center",gap:4,flexShrink:0}}>
+    <span style={{width:5,height:5,borderRadius:"50%",background:sr.dot,flexShrink:0}}/>
+    <span style={{color:sr.color,fontSize:8.5,fontWeight:600,fontFamily:"'DM Mono',monospace"}}>{source}</span>
+  </span>;
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function Toast({t}){
+  if(!t)return null;
+  const c={success:{bg:"#052e16",border:"#166534",color:"#86efac"},error:{bg:"#2d0808",border:"#7f1d1d",color:"#fca5a5"},info:{bg:"#082028",border:"#164e63",color:"#7dd3fc"}};
+  const s=c[t.type]||c.success;
+  return <div style={{position:"fixed",top:16,left:"50%",transform:"translateX(-50%)",zIndex:9999,
+    background:s.bg,border:`1px solid ${s.border}`,color:s.color,borderRadius:16,padding:"10px 18px",
+    fontSize:13,fontWeight:600,fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:8,
+    boxShadow:"0 8px 32px rgba(0,0,0,.5)",animation:"sd .2s ease",maxWidth:"90vw",whiteSpace:"nowrap"}}>
+    {t.msg}
+  </div>;
+}
+
+// ============================================================
+// CARD
+// ============================================================
+function Card({job,onSwipe,depth}){
+  const s=SS(job.sector);
+  const SectorIcon=s.Icon;
+  const [drag,setDrag]=useState(0),[dragging,setDragging]=useState(false),[open,setOpen]=useState(false),[exiting,setExiting]=useState(null);
+  const sx=useRef(null);
+  const doExit=useCallback(dir=>{setExiting(dir);setTimeout(()=>onSwipe(dir),330);},[onSwipe]);
+  const pd=e=>{if(open||depth!==0)return;sx.current=e.clientX??e.touches?.[0]?.clientX;setDragging(true);};
+  const pm=e=>{if(!dragging||sx.current==null)return;setDrag((e.clientX??e.touches?.[0]?.clientX)-sx.current);};
+  const pu=()=>{if(!dragging)return;setDragging(false);if(drag>100)doExit("save");else if(drag<-100)doExit("skip");else setDrag(0);sx.current=null;};
+  const sa=Math.max(0,Math.min(1,drag/90)),ka=Math.max(0,Math.min(1,-drag/90));
+  const ty=[0,14,26][depth]||0,sc=[1,.964,.930][depth]||1;
+
+  return(
+    <div onPointerDown={pd} onPointerMove={pm} onPointerUp={pu} onPointerLeave={pu}
+      style={{position:"absolute",width:"100%",touchAction:"none",
+        transform:exiting?(exiting==="save"?"translateX(130%) rotate(22deg)":"translateX(-130%) rotate(-22deg)")
+          :`translateX(${depth===0?drag:0}px) rotate(${depth===0?drag*0.054:0}deg) translateY(${ty}px) scale(${sc})`,
+        transition:exiting?"all .3s ease":dragging?"none":"transform .26s cubic-bezier(.34,1.56,.64,1)",
+        opacity:exiting?0:depth>2?0:1,zIndex:10-depth,cursor:depth!==0?"default":open?"default":"grab"}}>
+
+      {depth===0&&<>
+        <div style={{opacity:sa,position:"absolute",top:16,left:13,zIndex:20,pointerEvents:"none",transform:"rotate(-13deg)"}}>
+          <div style={{border:`3px solid ${s.accent}`,borderRadius:9,padding:"4px 13px",display:"flex",alignItems:"center",gap:5}}>
+            <span style={{color:s.accent}}><Icon.star/></span>
+            <span style={{color:s.accent,fontWeight:900,fontSize:16,letterSpacing:3,fontFamily:"'DM Mono',monospace"}}>SAVE</span>
+          </div>
+        </div>
+        <div style={{opacity:ka,position:"absolute",top:16,right:13,zIndex:20,pointerEvents:"none",transform:"rotate(13deg)"}}>
+          <div style={{border:"3px solid #f87171",borderRadius:9,padding:"4px 13px",display:"flex",alignItems:"center",gap:5}}>
+            <span style={{color:"#f87171"}}><Icon.x/></span>
+            <span style={{color:"#f87171",fontWeight:900,fontSize:16,letterSpacing:3,fontFamily:"'DM Mono',monospace"}}>SKIP</span>
+          </div>
+        </div>
+      </>}
+
+      <div style={{borderRadius:20,overflow:"hidden",border:`1px solid ${s.accent}1a`,
+        background:`linear-gradient(155deg,${s.bg} 0%,#020605 100%)`,
+        boxShadow:`0 20px 48px rgba(0,0,0,.72),inset 0 1px 0 ${s.accent}09`}}>
+        <div style={{padding:"14px 15px 11px",background:`linear-gradient(90deg,${s.accent}0d,transparent)`,borderBottom:`1px solid ${s.accent}0e`}}>
+          <div style={{display:"flex",gap:11,marginBottom:9}}>
+            <div style={{width:44,height:44,borderRadius:11,flexShrink:0,background:`${s.accent}13`,
+              border:`1px solid ${s.accent}20`,display:"flex",alignItems:"center",justifyContent:"center",color:s.accent}}>
+              <SectorIcon/>
+            </div>
+            <div style={{flex:1,minWidth:0}}>
+              <div style={{color:"#eaf4ee",fontWeight:700,fontSize:14.5,lineHeight:1.25,marginBottom:2,fontFamily:"'DM Sans',sans-serif"}}>{job.title}</div>
+              <div style={{color:s.accent,fontWeight:600,fontSize:12,fontFamily:"'DM Sans',sans-serif"}}>{job.company}</div>
+            </div>
+            <div style={{flexShrink:0,display:"flex",flexDirection:"column",alignItems:"flex-end",gap:4}}>
+              <div style={{background:`${s.accent}15`,border:`1px solid ${s.accent}28`,borderRadius:8,padding:"4px 8px",textAlign:"center"}}>
+                <div style={{color:s.accent,fontWeight:800,fontSize:13,fontFamily:"'DM Mono',monospace"}}>{job.match_score}%</div>
+                <div style={{color:`${s.accent}58`,fontSize:8,fontFamily:"'DM Mono',monospace"}}>match</div>
+              </div>
+              <Pill source={job.source}/>
+            </div>
+          </div>
+          <div style={{display:"flex",flexWrap:"wrap",gap:4}}>
+            {[job.sector,job.location,job.salary].filter(Boolean).map((t,i)=>(
+              <span key={i} style={{background:i===0?`${s.accent}10`:"#ffffff06",
+                border:`1px solid ${i===0?s.accent+"22":"#ffffff0b"}`,color:i===0?s.accent:"#6a8888",
+                borderRadius:20,padding:"2.5px 8px",fontSize:10,fontFamily:"'DM Mono',monospace"}}>{t}</span>
+            ))}
+          </div>
+        </div>
+
+        <div style={{padding:"11px 15px 9px"}}>
+          <p style={{color:"#a5bfb8",fontSize:12.5,lineHeight:1.72,margin:0,fontFamily:"'DM Sans',sans-serif"}}>{job.summary}</p>
+        </div>
+
+        <div style={{margin:"0 15px 10px",padding:"9px 12px",borderRadius:10,background:`${s.accent}06`,border:`1px solid ${s.accent}13`}}>
+          <div style={{color:s.accent,fontSize:8.5,fontWeight:700,letterSpacing:1.3,marginBottom:3,fontFamily:"'DM Mono',monospace"}}>WHY THIS FITS YOU</div>
+          <p style={{color:"#628080",fontSize:11.5,lineHeight:1.62,margin:0,fontFamily:"'DM Sans',sans-serif"}}>{job.why_fit}</p>
+        </div>
+
+        <div style={{overflow:"hidden",maxHeight:open?400:0,transition:"max-height .3s ease"}}>
+          <div style={{padding:"10px 15px 13px",borderTop:"1px solid #ffffff05",display:"flex",flexDirection:"column",gap:8}}>
+            {[["RESPONSIBILITIES",job.responsibilities],["REQUIREMENTS",job.requirements]].map(([l,tx])=>tx&&(
+              <div key={l}>
+                <div style={{color:"#243830",fontSize:8.5,letterSpacing:1.3,fontWeight:700,marginBottom:3,fontFamily:"'DM Mono',monospace"}}>{l}</div>
+                <p style={{color:"#628080",fontSize:11.5,lineHeight:1.65,margin:0,fontFamily:"'DM Sans',sans-serif"}}>{tx}</p>
+              </div>
+            ))}
+            {job.url&&<a href={job.url} target="_blank" rel="noopener noreferrer"
+              style={{color:s.accent,fontSize:12.5,fontWeight:600,textDecoration:"none",fontFamily:"'DM Sans',sans-serif",
+                display:"inline-flex",alignItems:"center",gap:5}}>
+              View listing <Icon.extlink/>
+            </a>}
+          </div>
+        </div>
+
+        <div style={{padding:"7px 15px 13px",display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <button onClick={e=>{e.stopPropagation();setOpen(v=>!v);}}
+            style={{background:"none",border:"none",color:"#1a2e20",fontSize:11,cursor:"pointer",
+              fontFamily:"'DM Mono',monospace",padding:0,display:"flex",alignItems:"center",gap:3}}>
+            {open?<Icon.arrowup/>:<Icon.arrowdown/>}{open?"less":"details"}
+          </button>
+          <span style={{color:"#131c14",fontSize:10,fontFamily:"'DM Mono',monospace"}}>{job.posted_ago}</span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// SHEET PANEL
+// ============================================================
+function SheetPanel({jobs,username,onClose,onDownload}){
+  const cols=["Title","Company","Sector","Location","Salary","Source"];
+  return(
+    <div style={{position:"fixed",inset:0,zIndex:100,display:"flex",alignItems:"flex-end",
+      background:"rgba(0,0,0,.82)",backdropFilter:"blur(6px)",animation:"fi .18s ease"}} onClick={onClose}>
+      <div style={{width:"100%",height:"82vh",borderRadius:"22px 22px 0 0",background:"#030906",
+        border:"1px solid #1a2e20",borderBottom:"none",display:"flex",flexDirection:"column",
+        animation:"su .26s cubic-bezier(.34,1.56,.64,1)"}} onClick={e=>e.stopPropagation()}>
+        <div style={{padding:"16px 16px 12px",borderBottom:"1px solid #0e1e12",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:12}}>
+            <div style={{display:"flex",alignItems:"center",gap:8}}>
+              <div style={{color:"#34d399"}}><Icon.table/></div>
+              <div>
+                <div style={{color:"#d8ece2",fontWeight:700,fontSize:15,fontFamily:"'DM Sans',sans-serif"}}>
+                  {username}'s saved jobs - {jobs.length}
+                </div>
+                <div style={{color:"#1e3828",fontSize:9,fontFamily:"'DM Mono',monospace",marginTop:1}}>GreenSwipe</div>
+              </div>
+            </div>
+            <button onClick={onClose} style={{background:"#091410",border:"1px solid #132018",borderRadius:7,
+              padding:"5px 11px",color:"#305040",cursor:"pointer",fontSize:11,fontFamily:"'DM Mono',monospace"}}>
+              close
+            </button>
+          </div>
+          <button onClick={onDownload} style={{width:"100%",display:"flex",alignItems:"center",gap:10,
+            padding:"11px 15px",background:"linear-gradient(90deg,#0a2018,#082018)",border:"1px solid #1a4828",
+            borderRadius:12,cursor:"pointer",textAlign:"left"}}>
+            <div style={{color:"#34d399"}}><Icon.download/></div>
+            <div style={{flex:1}}>
+              <div style={{color:"#34d399",fontWeight:700,fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>Download as CSV</div>
+              <div style={{color:"#1e4030",fontSize:10,fontFamily:"'DM Mono',monospace",marginTop:1}}>Import into Google Sheets or Excel</div>
+            </div>
+            <div style={{background:"#34d39920",border:"1px solid #34d39940",borderRadius:6,padding:"3px 8px",
+              color:"#34d399",fontSize:10,fontWeight:700,fontFamily:"'DM Mono',monospace",
+              display:"flex",alignItems:"center",gap:3}}>CSV <Icon.arrowright/></div>
+          </button>
+        </div>
+        <div style={{flex:1,overflow:"auto"}}>
+          {jobs.length===0?(
+            <div style={{textAlign:"center",padding:"48px 20px"}}>
+              <div style={{color:"#34d399",marginBottom:12,display:"flex",justifyContent:"center"}}><Icon.seedling/></div>
+              <div style={{color:"#1e3028",fontSize:13,fontFamily:"'DM Sans',sans-serif"}}>No saved jobs yet - swipe to save</div>
+            </div>
+          ):(
+            <table style={{width:"100%",borderCollapse:"collapse"}}>
+              <thead>
+                <tr style={{background:"#081410",position:"sticky",top:0,zIndex:2}}>
+                  {[...cols,"Apply"].map(c=><th key={c} style={{padding:"8px 12px",textAlign:"left",color:"#2a5040",
+                    fontWeight:700,fontSize:9,letterSpacing:1.2,borderBottom:"1px solid #0e2018",
+                    whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>{c}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {jobs.map((job,i)=>{
+                  const s=SS(job.sector);
+                  return <tr key={i} style={{borderBottom:"1px solid #0a1810",background:i%2===0?"transparent":"#060e08"}}>
+                    <td style={{padding:"10px 12px",verticalAlign:"middle",minWidth:150}}>
+                      <div style={{color:"#c8dcd4",fontWeight:600,fontSize:11.5,lineHeight:1.3,fontFamily:"'DM Sans',sans-serif"}}>{job.title}</div>
+                    </td>
+                    <td style={{padding:"10px 12px",verticalAlign:"middle",minWidth:100}}>
+                      <div style={{color:s.accent,fontWeight:600,fontSize:11,whiteSpace:"nowrap",fontFamily:"'DM Sans',sans-serif"}}>{job.company}</div>
+                    </td>
+                    <td style={{padding:"10px 12px",verticalAlign:"middle",minWidth:120}}>
+                      <span style={{background:`${s.accent}12`,border:`1px solid ${s.accent}22`,color:s.accent,
+                        borderRadius:20,padding:"2px 8px",fontSize:10,whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>{job.sector}</span>
+                    </td>
+                    <td style={{padding:"10px 12px",verticalAlign:"middle",color:"#607870",minWidth:110,whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",fontSize:10}}>{job.location}</td>
+                    <td style={{padding:"10px 12px",verticalAlign:"middle",color:"#607870",minWidth:90,whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace",fontSize:10}}>{job.salary||"-"}</td>
+                    <td style={{padding:"10px 12px",verticalAlign:"middle"}}><Pill source={job.source}/></td>
+                    <td style={{padding:"10px 12px",verticalAlign:"middle"}}>
+                      {job.url&&<a href={job.url} target="_blank" rel="noopener noreferrer"
+                        style={{display:"inline-flex",alignItems:"center",gap:4,background:"#0a1e12",
+                          border:"1px solid #1a3820",borderRadius:7,padding:"4px 9px",color:"#34d399",
+                          textDecoration:"none",fontSize:10,fontWeight:700,whiteSpace:"nowrap",fontFamily:"'DM Mono',monospace"}}>
+                        Apply <Icon.arrowright/>
+                      </a>}
+                    </td>
+                  </tr>;
+                })}
+              </tbody>
+            </table>
+          )}
+        </div>
+        {jobs.length>0&&(
+          <div style={{padding:"10px 16px",borderTop:"1px solid #0e1e12",display:"flex",gap:14,alignItems:"center",flexShrink:0}}>
+            {[["Saved",jobs.length],["Sectors",[...new Set(jobs.map(j=>j.sector))].length],["Sources",[...new Set(jobs.map(j=>j.source))].length]].map(([l,v])=>(
+              <div key={l}>
+                <div style={{color:"#34d399",fontWeight:700,fontSize:14,fontFamily:"'DM Mono',monospace"}}>{v}</div>
+                <div style={{color:"#1e3028",fontSize:9,fontFamily:"'DM Mono',monospace"}}>{l}</div>
+              </div>
+            ))}
+            <div style={{marginLeft:"auto"}}>
+              <button onClick={onDownload} style={{background:"linear-gradient(135deg,#065f46,#059669)",border:"none",
+                borderRadius:9,padding:"7px 15px",color:"#fff",fontWeight:700,fontSize:12,cursor:"pointer",
+                fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:6}}>
+                <Icon.download/> Download CSV
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// MAIN APP (shown after login)
+// ============================================================
+function MainApp({username,isAdmin,onLogout}){
+  const [userData,setUserData_]=useState(()=>getUserData(username));
+  const [sheetUrl,setSheetUrl]=useState(()=>getUserSheetUrl(username));
+  const [toast,setToast]=useState(null);
+  const [showSheet,setShowSheet]=useState(false);
+  const [showAdmin,setShowAdmin]=useState(false);
+  const hasInit=useRef(false);
+  const timer=useRef(null);
+
+  const idx=userData.idx||0;
+  const saved=userData.saved||[];
+
+  useEffect(()=>{
+    if(!hasInit.current){hasInit.current=true;return;}
+    setUserData(username,userData);
+  },[userData,username]);
+
+  const showT=useCallback((msg,type="success",dur=3200)=>{
+    clearTimeout(timer.current);
+    setToast({msg,type});
+    if(dur>0) timer.current=setTimeout(()=>setToast(null),dur);
+  },[]);
+
+  const handleSwipe=useCallback(async dir=>{
+    if(idx>=JOBS.length) return;
+    const job=JOBS[idx];
+    setUserData_(prev=>{
+      const newData={...prev,idx:(prev.idx||0)+1};
+      if(dir==="save") newData.saved=[...(prev.saved||[]),job];
+      return newData;
+    });
+    if(dir==="save"){
+      showT("Saved: "+job.company);
+      // Sync to Google Sheet in background
+      if(APPS_SCRIPT_URL){
+        syncJobToSheet(username,job).then(url=>{
+          if(url) setSheetUrl(url);
+        });
+      }
+    }
+  },[idx,username,showT]);
+
+  const resetProgress=useCallback(()=>{
+    setUserData_(prev=>({...prev,idx:0}));
+    showT("Progress reset","info");
+  },[showT]);
+
+  const openSheet=useCallback(()=>{
+    if(sheetUrl){
+      window.open(sheetUrl,"_blank");
+    } else if(APPS_SCRIPT_URL){
+      showT("Save a job first to create your sheet","info");
+    } else {
+      showT("Google Sheets not configured yet","info");
+    }
+  },[sheetUrl,showT]);
+
+  const remaining=JOBS.length-idx;
+  const pct=JOBS.length>0?idx/JOBS.length:0;
+
+  return(
+    <div style={{minHeight:"100vh",display:"flex",flexDirection:"column",width:"100%",
+      background:"radial-gradient(ellipse at 20% 20%,#042e1408 0%,transparent 45%),radial-gradient(ellipse at 80% 80%,#082e1808 0%,transparent 45%),#020604"}}>
+      <Toast t={toast}/>
+
+      <div style={{flex:1,display:"flex",flexDirection:"column",width:"100%",maxWidth:520,margin:"0 auto",
+        padding:"0 0 env(safe-area-inset-bottom)"}}>
+
+        {/* Header */}
+        <div style={{padding:"16px 18px 10px",display:"flex",alignItems:"center",justifyContent:"space-between",flexShrink:0}}>
+          <div style={{display:"flex",alignItems:"center",gap:9}}>
+            <div style={{width:34,height:34,borderRadius:9,background:"linear-gradient(135deg,#059669,#34d399)",
+              display:"flex",alignItems:"center",justifyContent:"center",color:"white",flexShrink:0}}>
+              <Icon.leaf/>
+            </div>
+            <div>
+              <div style={{color:"#e2ede8",fontWeight:700,fontSize:16,lineHeight:1,fontFamily:"'DM Sans',sans-serif"}}>GreenSwipe</div>
+              <div style={{color:"#1e4028",fontSize:9,fontFamily:"'DM Mono',monospace",marginTop:2,display:"flex",alignItems:"center",gap:5}}>
+                <span style={{color:"#34d399"}}>{username}</span>
+                {isAdmin&&<span style={{background:"#081c08",border:"1px solid #1a4020",borderRadius:4,padding:"0px 5px",color:"#34d399",fontSize:8}}>admin</span>}
+              </div>
+            </div>
+          </div>
+          <div style={{display:"flex",gap:7,alignItems:"center"}}>
+            {/* Admin button */}
+            {isAdmin&&(
+              <button onClick={()=>setShowAdmin(true)}
+                style={{background:"#081808",border:"1px solid #1a3010",borderRadius:8,padding:"7px 10px",
+                  cursor:"pointer",color:"#a3e635",display:"flex",alignItems:"center",gap:5}}>
+                <Icon.users/>
+                <span style={{fontSize:10,fontWeight:700,fontFamily:"'DM Mono',monospace"}}>Users</span>
+              </button>
+            )}
+            {/* Sheet button */}
+            <button onClick={()=>setShowSheet(true)} style={{display:"flex",alignItems:"center",gap:7,
+              background:saved.length>0?"linear-gradient(135deg,#082018,#0a2818)":"#060e07",
+              border:`1px solid ${saved.length>0?"#1a5030":"#0e1810"}`,
+              borderRadius:9,padding:"8px 13px",cursor:"pointer",
+              boxShadow:saved.length>0?"0 0 16px rgba(52,211,153,.2)":"none",flexShrink:0}}>
+              <div style={{color:saved.length>0?"#34d399":"#1e3020"}}><Icon.table/></div>
+              <div style={{textAlign:"left"}}>
+                <div style={{color:saved.length>0?"#34d399":"#1e3020",fontSize:11,fontWeight:700,fontFamily:"'DM Mono',monospace",lineHeight:1}}>My Sheet</div>
+                <div style={{color:saved.length>0?"#1e5030":"#0e1e10",fontSize:9,fontFamily:"'DM Mono',monospace",lineHeight:1,marginTop:2}}>{saved.length} saved</div>
+              </div>
+            </button>
+            {/* Logout */}
+            <button onClick={onLogout} title="Sign out"
+              style={{background:"#060e07",border:"1px solid #0e1810",borderRadius:8,padding:"8px 9px",
+                cursor:"pointer",color:"#1e3020",display:"flex",alignItems:"center"}}>
+              <Icon.logout/>
+            </button>
+          </div>
+        </div>
+
+        {/* Progress */}
+        <div style={{padding:"0 18px 14px",flexShrink:0}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:5}}>
+            <span style={{color:"#1e3828",fontSize:10,fontFamily:"'DM Mono',monospace"}}>{idx}/{JOBS.length} reviewed &middot; {saved.length} saved</span>
+            <button onClick={resetProgress}
+              style={{background:"none",border:"none",color:"#1a3020",fontSize:9.5,fontFamily:"'DM Mono',monospace",
+                cursor:"pointer",padding:0,display:"flex",alignItems:"center",gap:4}}>
+              <Icon.refresh/> restart
+            </button>
+          </div>
+          <div style={{height:3,background:"#081008",borderRadius:2}}>
+            <div style={{height:"100%",background:"linear-gradient(90deg,#065f46,#34d399)",borderRadius:2,
+              width:`${pct*100}%`,transition:"width .4s ease"}}/>
+          </div>
+        </div>
+
+        {/* Cards */}
+        <div style={{flex:1,padding:"0 16px",display:"flex",flexDirection:"column",minHeight:0}}>
+          {remaining===0?(
+            <div style={{flex:1,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",
+              textAlign:"center",padding:20}}>
+              <div style={{color:"#34d399",marginBottom:16,transform:"scale(1.4)"}}><Icon.seedling/></div>
+              <div style={{color:"#d8e8e0",fontSize:22,fontWeight:700,marginBottom:8,fontFamily:"'DM Sans',sans-serif"}}>All {JOBS.length} reviewed!</div>
+              <div style={{color:"#2a5040",fontSize:14,marginBottom:28,fontFamily:"'DM Sans',sans-serif",lineHeight:1.5}}>
+                {saved.length>0?`${saved.length} job${saved.length>1?"s":""} saved - download your CSV!`:"Nothing saved yet."}
+              </div>
+              <div style={{display:"flex",gap:12,justifyContent:"center",flexWrap:"wrap"}}>
+                <button onClick={resetProgress}
+                  style={{background:"#081410",border:"1px solid #1a3820",borderRadius:12,padding:"12px 22px",
+                    color:"#4a8060",fontWeight:700,fontSize:14,cursor:"pointer",fontFamily:"'DM Sans',sans-serif",
+                    display:"flex",alignItems:"center",gap:7}}>
+                  <Icon.refresh/> Start over
+                </button>
+                {saved.length>0&&<button onClick={downloadCSV}
+                  style={{background:"linear-gradient(135deg,#065f46,#059669)",border:"none",borderRadius:12,
+                    padding:"12px 22px",color:"#fff",fontWeight:700,fontSize:14,cursor:"pointer",
+                    fontFamily:"'DM Sans',sans-serif",display:"flex",alignItems:"center",gap:7}}>
+                  <Icon.download/> Download CSV
+                </button>}
+              </div>
+            </div>
+          ):(
+            <>
+              <div style={{flex:1,position:"relative",minHeight:400,maxHeight:620}}>
+                {JOBS.slice(idx,idx+3).map((job,d)=>(
+                  <Card key={job.id} job={job} depth={d} onSwipe={d===0?handleSwipe:()=>{}}/>
+                ))}
+              </div>
+              <div style={{padding:"18px 0 24px",display:"flex",alignItems:"center",justifyContent:"center",gap:28,flexShrink:0}}>
+                <button onClick={()=>handleSwipe("skip")}
+                  style={{width:58,height:58,borderRadius:"50%",background:"#050d07",border:"2px solid #5a1a1a",
+                    cursor:"pointer",display:"flex",alignItems:"center",justifyContent:"center",color:"#f87171",flexShrink:0}}
+                  onPointerDown={e=>e.currentTarget.style.transform="scale(.93)"}
+                  onPointerUp={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <Icon.x/>
+                </button>
+                <div style={{textAlign:"center",minWidth:60}}>
+                  <div style={{color:"#162018",fontSize:10,fontFamily:"'DM Mono',monospace"}}>drag or tap</div>
+                  <div style={{color:"#0e1810",fontSize:9,fontFamily:"'DM Mono',monospace",marginTop:2}}>skip &middot; save</div>
+                </div>
+                <button onClick={()=>handleSwipe("save")}
+                  style={{width:66,height:66,borderRadius:"50%",background:"linear-gradient(135deg,#065f46,#059669)",
+                    border:"2px solid #34d399",cursor:"pointer",display:"flex",alignItems:"center",
+                    justifyContent:"center",color:"white",boxShadow:"0 4px 24px rgba(52,211,153,.25)",flexShrink:0}}
+                  onPointerDown={e=>e.currentTarget.style.transform="scale(.93)"}
+                  onPointerUp={e=>e.currentTarget.style.transform="scale(1)"}>
+                  <Icon.star/>
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      {showSheet&&<SheetPanel jobs={saved} username={username} sheetUrl={sheetUrl} onClose={()=>setShowSheet(false)} onOpenSheet={openSheet}/>}
+      {showAdmin&&isAdmin&&<AdminPanel currentUser={username} onClose={()=>setShowAdmin(false)}/>}
+    </div>
+  );
+}
+
+// ============================================================
+// ROOT - handles auth state
+// ============================================================
+function Root(){
+  const [session,setSession]=useState(null); // {username, isAdmin} | null
+  const [checked,setChecked]=useState(false);
+
+  useEffect(()=>{
+    const s=ls.get("gs:session");
+    if(s?.username) setSession(s);
+    setChecked(true);
+  },[]);
+
+  const handleLogin=(username,isAdmin)=>{
+    const s={username,isAdmin};
+    ls.set("gs:session",s);
+    setSession(s);
+  };
+
+  const handleLogout=()=>{
+    ls.del("gs:session");
+    setSession(null);
+  };
+
+  if(!checked) return(
+    <div style={{flex:1,display:"flex",alignItems:"center",justifyContent:"center",background:"#020604"}}>
+      <div style={{color:"#1e4028",fontSize:12,fontFamily:"'DM Mono',monospace",animation:"pulse 1.5s ease infinite"}}>loading...</div>
+    </div>
+  );
+
+  if(!session) return <LoginScreen onLogin={handleLogin}/>;
+  return <MainApp username={session.username} isAdmin={session.isAdmin} onLogout={handleLogout}/>;
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<Root/>);
+</script>
+</body>
+</html>
